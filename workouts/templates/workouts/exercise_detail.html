@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ exercise.name }} | Gym Optimizer{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Back navigation -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <a href="{% url 'exercise_library' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i> Back to Exercise Library
+            </a>
+        </div>
+    </div>
+    
+    <!-- Exercise details -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-5 mb-4 mb-md-0">
+                            {% if exercise.image %}
+                                <img src="{{ exercise.image.url }}" class="img-fluid rounded" alt="{{ exercise.name }}">
+                            {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 300px;">
+                                    <i class="fas fa-dumbbell fa-4x text-secondary"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-7">
+                            <h1 class="h2 mb-3">{{ exercise.name }}</h1>
+                            
+                            <div class="mb-3">
+                                <span class="badge bg-primary">{{ exercise.get_category_display }}</span>
+                                <span class="badge {% if exercise.difficulty == 'beginner' %}bg-success{% elif exercise.difficulty == 'intermediate' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ exercise.get_difficulty_display }}
+                                </span>
+                                {% if exercise.is_compound %}<span class="badge bg-info">Compound</span>{% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5>Primary Muscle Group</h5>
+                                <p><i class="fas fa-bullseye me-2"></i>{{ exercise.muscle_group.name }}</p>
+                            </div>
+                            
+                            {% if exercise.secondary_muscle_groups.exists %}
+                            <div class="mb-3">
+                                <h5>Secondary Muscle Groups</h5>
+                                <p>
+                                    {% for group in exercise.secondary_muscle_groups.all %}
+                                        <span class="badge bg-secondary me-1">{{ group.name }}</span>
+                                    {% endfor %}
+                                </p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if exercise.equipment_needed %}
+                            <div class="mb-3">
+                                <h5>Equipment Needed</h5>
+                                <p><i class="fas fa-tools me-2"></i>{{ exercise.equipment_needed }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if logs %}
+                            <div class="mb-3">
+                                <h5>Your Stats</h5>
+                                <p>Last used weight: <strong>{{ logs.0.weight }}kg</strong> ({{ logs.0.date|date:"M d, Y" }})</p>
+                                <p>Average weight: <strong>{{ exercise.get_average_weight:request.user }}kg</strong></p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Description</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ exercise.description }}</p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ exercise.instructions|linebreaks }}</p>
+                </div>
+            </div>
+            
+            {% if exercise.video_url %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Video Demonstration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9">
+                        <iframe src="{{ exercise.video_url }}" allowfullscreen></iframe>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if logs %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Your History</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Weight</th>
+                                    <th>Sets</th>
+                                    <th>Reps</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>{{ log.date|date:"M d, Y" }}</td>
+                                    <td>{{ log.weight }}kg</td>
+                                    <td>{{ log.completed_sets }}</td>
+                                    <td>{{ log.completed_reps }}</td>
+                                    <td>{{ log.notes|truncatechars:30 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- Similar exercises -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Similar Exercises</h5>
+                </div>
+                <div class="card-body">
+                    {% if similar_exercises %}
+                        <div class="list-group">
+                            {% for similar in similar_exercises %}
+                                <a href="{% url 'exercise_detail' similar.id %}" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ similar.name }}</h6>
+                                        <span class="badge {% if similar.difficulty == 'beginner' %}bg-success{% elif similar.difficulty == 'intermediate' %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ similar.get_difficulty_display }}
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">{{ similar.muscle_group.name }}</small>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No similar exercises found.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Add to workout plan -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Add to Workout Plan</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Add this exercise to one of your workout plans:</p>
+                    
+                    <form action="{% url 'add_exercise_to_plan' exercise.id %}" method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="workout_plan" class="form-label">Select Workout Plan</label>
+                            <select name="workout_plan" id="workout_plan" class="form-select" required>
+                                <option value="">-- Select Plan --</option>
+                                {% for plan in request.user.created_plans.all %}
+                                    <option value="{{ plan.id }}">{{ plan.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="day_of_week" class="form-label">Day of Week</label>
+                            <select name="day_of_week" id="day_of_week" class="form-select" required>
+                                <option value="">-- Select Day --</option>
+                                <option value="0">Monday</option>
+                                <option value="1">Tuesday</option>
+                                <option value="2">Wednesday</option>
+                                <option value="3">Thursday</option>
+                                <option value="4">Friday</option>
+                                <option value="5">Saturday</option>
+                                <option value="6">Sunday</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sets" class="form-label">Sets</label>
+                            <input type="number" name="sets" id="sets" class="form-control" min="1" max="10" value="3" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reps" class="form-label">Reps</label>
+                            <input type="text" name="reps" id="reps" class="form-control" placeholder="e.g., 8-12 or 10" value="8-12" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="rest_time" class="form-label">Rest Time (seconds)</label>
+                            <input type="number" name="rest_time" id="rest_time" class="form-control" min="30" max="300" step="15" value="60" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Add to Plan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
