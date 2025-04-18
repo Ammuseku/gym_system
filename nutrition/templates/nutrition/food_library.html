@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+
+{% block title %}Food Library - Gym Optimizer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .food-card {
+        transition: transform 0.3s;
+        height: 100%;
+    }
+    .food-card:hover {
+        transform: translateY(-5px);
+    }
+    .macro-bar {
+        height: 6px;
+        border-radius: 3px;
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+    .macro-segment {
+        height: 100%;
+        float: left;
+    }
+    .protein-segment {
+        background-color: #4e73df;
+    }
+    .carbs-segment {
+        background-color: #1cc88a;
+    }
+    .fat-segment {
+        background-color: #f6c23e;
+    }
+    .search-box {
+        border-radius: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+    .category-badge {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .category-badge:hover {
+        transform: scale(1.05);
+    }
+    .food-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+    .nutrient-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    .nutrient-value {
+        font-weight: 500;
+    }
+    .pagination-container {
+        overflow-x: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1">Food Library</h1>
+            <p class="text-muted">Browse and search for nutritional information</p>
+        </div>
+        <div>
+            <a href="{% url 'add_food' %}" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> Add New Food
+            </a>
+        </div>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="row mb-4">
+        <div class="col-md-8 mb-3 mb-md-0">
+            <form method="get" action="{% url 'food_library' %}">
+                <div class="input-group search-box">
+                    <span class="input-group-text bg-transparent border-end-0">
+                        <i class="fas fa-search text-muted"></i>
+                    </span>
+                    <input type="text" name="query" class="form-control border-start-0 ps-0"
+                        placeholder="Search for foods..." value="{{ query }}">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex justify-content-end">
+                <a href="{% url 'search_spoonacular' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-cloud"></i> Search External Database
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Category Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge rounded-pill bg-primary category-badge px-3 py-2">All Foods</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">Proteins</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">Carbohydrates</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">Fruits & Vegetables</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">Dairy</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">Snacks</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">Beverages</span>
+                <span class="badge rounded-pill bg-light text-dark category-badge px-3 py-2">My Foods</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Food List -->
+    <div class="row">
+        {% if foods %}
+            {% for food in foods %}
+                <div class="col-md-6 col-lg-4 col-xl-3 mb-4">
+                    <div class="card shadow-sm food-card">
+                        <div class="card-body">
+                            <div class="d-flex mb-3">
+                                {% if food.image_url %}
+                                    <img src="{{ food.image_url }}" alt="{{ food.name }}" class="food-image me-3">
+                                {% else %}
+                                    <div class="food-image me-3 bg-light d-flex align-items-center justify-content-center">
+                                        <i class="fas fa-utensils text-muted"></i>
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <h5 class="card-title mb-1">{{ food.name }}</h5>
+                                    <p class="card-text text-muted small mb-0">{{ food.serving_size }}</p>
+                                    {% if food.is_user_created %}
+                                        <span class="badge bg-info text-white small">Custom</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Macronutrient Distribution Bar -->
+                            <div class="macro-bar">
+                                {% with total=food.protein|add:food.carbs|add:food.fat %}
+                                    {% if total > 0 %}
+                                        <div class="macro-segment protein-segment"
+                                            style="width: {{ food.protein|div:total|mul:100 }}%;"
+                                            title="Protein: {{ food.protein }}g"></div>
+                                        <div class="macro-segment carbs-segment"
+                                            style="width: {{ food.carbs|div:total|mul:100 }}%;"
+                                            title="Carbs: {{ food.carbs }}g"></div>
+                                        <div class="macro-segment fat-segment"
+                                            style="width: {{ food.fat|div:total|mul:100 }}%;"
+                                            title="Fat: {{ food.fat }}g"></div>
+                                    {% else %}
+                                        <div class="macro-segment bg-light" style="width: 100%;"></div>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+
+                            <!-- Nutrition Info -->
+                            <div class="row text-center mb-3">
+                                <div class="col-3">
+                                    <div class="nutrient-label">Calories</div>
+                                    <div class="nutrient-value">{{ food.calories }}</div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="nutrient-label">Protein</div>
+                                    <div class="nutrient-value">{{ food.protein }}g</div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="nutrient-label">Carbs</div>
+                                    <div class="nutrient-value">{{ food.carbs }}g</div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="nutrient-label">Fat</div>
+                                    <div class="nutrient-value">{{ food.fat }}g</div>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="d-flex justify-content-between">
+                                <a href="{% url 'food_detail' food.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-info-circle"></i> Details
+                                </a>
+                                <div>
+                                    {% if food.is_user_created and food.created_by == user %}
+                                        <a href="{% url 'edit_food' food.id %}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-sm btn-primary add-to-meal-btn" data-food-id="{{ food.id }}">
+                                        <i class="fas fa-plus"></i> Add to Meal
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        {% if query %}
+                            <h5>No foods found matching "{{ query }}"</h5>
+                            <p class="text-muted">Try a different search term or add a new food item</p>
+                            <div class="mt-3">
+                                <a href="{% url 'food_library' %}" class="btn btn-outline-primary me-2">Clear Search</a>
+                                <a href="{% url 'add_food' %}" class="btn btn-primary">Add New Food</a>
+                            </div>
+                        {% else %}
+                            <h5>No foods found in your library</h5>
+                            <p class="text-muted">Get started by adding foods or searching external databases</p>
+                            <div class="mt-3">
+                                <a href="{% url 'search_spoonacular' %}" class="btn btn-outline-primary me-2">Search Database</a>
+                                <a href="{% url 'add_food' %}" class="btn btn-primary">Add New Food</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if foods.paginator.num_pages > 1 %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="pagination-container d-flex justify-content-center">
+                    <ul class="pagination">
+                        {% if foods.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query %}query={{ query }}&{% endif %}page=1">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query %}query={{ query }}&{% endif %}page={{ foods.previous_page_number }}">Previous</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">First</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                        {% endif %}
+
+                        {% for i in foods.paginator.page_range %}
+                            {% if foods.number == i %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ i }}</span>
+                                </li>
+                            {% elif i > foods.number|add:"-3" and i < foods.number|add:"3" %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if query %}query={{ query }}&{% endif %}page={{ i }}">{{ i }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if foods.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query %}query={{ query }}&{% endif %}page={{ foods.next_page_number }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query %}query={{ query }}&{% endif %}page={{ foods.paginator.num_pages }}">Last</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Next</span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Last</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Add to Meal Modal -->
+<div class="modal fade" id="addToMealModal" tabindex="-1" aria-labelledby="addToMealModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addToMealModalLabel">Add to Meal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addToMealForm" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="food_item" id="selectedFoodId">
+
+                    <div class="mb-3">
+                        <label for="mealSelect" class="form-label">Select Meal</label>
+                        <select class="form-select" id="mealSelect" name="meal" required>
+                            <option value="">Choose a meal...</option>
+                            {% if active_plan and today_meals %}
+                                {% for meal in today_meals %}
+                                    <option value="{{ meal.id }}">{{ meal.get_meal_type_display }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="servingsInput" class="form-label">Number of Servings</label>
+                        <input type="number" class="form-control" id="servingsInput" name="servings"
+                            value="1" min="0.25" step="0.25" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notesInput" class="form-label">Notes (optional)</label>
+                        <input type="text" class="form-control" id="notesInput" name="notes"
+                            placeholder="E.g., cooked, raw, brand...">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitAddToMeal">Add to Meal</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Category badge selection
+    const categoryBadges = document.querySelectorAll('.category-badge');
+    categoryBadges.forEach(badge => {
+        badge.addEventListener('click', function() {
+            // Remove active class from all badges
+            categoryBadges.forEach(b => {
+                b.classList.remove('bg-primary', 'text-white');
+                b.classList.add('bg-light', 'text-dark');
+            });
+
+            // Add active class to clicked badge
+            this.classList.remove('bg-light', 'text-dark');
+            this.classList.add('bg-primary', 'text-white');
+
+            // Filter foods based on category (this would require AJAX in a real implementation)
+            const category = this.textContent.trim();
+            console.log(`Filtering by category: ${category}`);
+
+            // In a real implementation, you would make an AJAX request here
+            // to filter foods by category and update the list
+        });
+    });
+
+    // Add to Meal functionality
+    const addToMealButtons = document.querySelectorAll('.add-to-meal-btn');
+    const addToMealModal = new bootstrap.Modal(document.getElementById('addToMealModal'));
+    const selectedFoodIdInput = document.getElementById('selectedFoodId');
+    const addToMealForm = document.getElementById('addToMealForm');
+
+    addToMealButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const foodId = this.getAttribute('data-food-id');
+            selectedFoodIdInput.value = foodId;
+            addToMealModal.show();
+        });
+    });
+
+    // Submit form when user clicks "Add to Meal" in modal
+    document.getElementById('submitAddToMeal').addEventListener('click', function() {
+        const mealSelect = document.getElementById('mealSelect');
+
+        if (mealSelect.value === '') {
+            // No meal selected, handle the case (either show error or create new meal)
+            alert('Please select a meal or create a new one');
+        } else {
+            // Submit the form to add food to the selected meal
+            const mealId = mealSelect.value;
+            addToMealForm.action = `/nutrition/meals/${mealId}/add-food/`;
+            addToMealForm.submit();
+        }
+    });
+});
+</script>
+{% endblock %}

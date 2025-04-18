@@ -1,0 +1,580 @@
+{% extends 'base.html' %}
+
+{% block title %}Nutrition Dashboard - Gym Optimizer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .macro-chart {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto;
+    }
+    .macro-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .nutrient-progress {
+        height: 8px;
+        border-radius: 4px;
+    }
+    .meal-card {
+        transition: transform 0.2s;
+    }
+    .meal-card:hover {
+        transform: translateY(-3px);
+    }
+    .food-item {
+        border-left: 3px solid transparent;
+        transition: all 0.2s;
+    }
+    .food-item:hover {
+        background-color: rgba(0,0,0,0.02);
+    }
+    .food-item.protein {
+        border-left-color: #4e73df;
+    }
+    .food-item.carbs {
+        border-left-color: #1cc88a;
+    }
+    .food-item.fat {
+        border-left-color: #f6c23e;
+    }
+    .calorie-summary {
+        border-radius: 10px;
+        background: linear-gradient(to right, #36b9cc, #1cc88a);
+        color: white;
+    }
+    .stat-circle {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        margin: 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1">Nutrition Dashboard</h1>
+            <p class="text-muted">{{ today|date:"l, F j, Y" }}</p>
+        </div>
+        <div>
+            <a href="{% url 'log_nutrition' %}" class="btn btn-primary me-2">
+                <i class="fas fa-utensils"></i> Log Nutrition
+            </a>
+            <a href="{% url 'meal_plans' %}" class="btn btn-outline-primary">
+                <i class="fas fa-clipboard-list"></i> Meal Plans
+            </a>
+        </div>
+    </div>
+
+    <!-- Daily Summary Section -->
+    <div class="row mb-4">
+        <!-- Left Column: Calorie & Macro Summary -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-0">
+                    <!-- Calories Summary -->
+                    <div class="calorie-summary p-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1">Today's Calories</h5>
+                                <div class="d-flex align-items-baseline">
+                                    <h2 class="mb-0 me-2">
+                                        {% if today_log.calories_consumed %}
+                                            {{ today_log.calories_consumed }}
+                                        {% else %}
+                                            0
+                                        {% endif %}
+                                    </h2>
+                                    <span class="text-light">/
+                                        {% if today_log.calories_target %}
+                                            {{ today_log.calories_target }}
+                                        {% elif active_plan %}
+                                            {{ active_plan.calories_target }}
+                                        {% else %}
+                                            --
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="progress" style="height: 10px; width: 60%;">
+                                <div class="progress-bar bg-light" role="progressbar"
+                                    style="width: {% if today_log %}{{ today_log.get_calories_percentage }}{% else %}0{% endif %}%;"
+                                    aria-valuenow="{% if today_log %}{{ today_log.get_calories_percentage }}{% else %}0{% endif %}"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Macronutrients -->
+                    <div class="row text-center px-4 pb-4">
+                        <!-- Protein -->
+                        <div class="col-md-4">
+                            <div class="macro-chart mb-2">
+                                <canvas id="proteinChart"></canvas>
+                            </div>
+                            <h6 class="macro-label text-primary mb-1">Protein</h6>
+                            <div class="d-flex justify-content-center align-items-baseline">
+                                <span class="h5 mb-0 me-1">
+                                    {% if today_log.protein_consumed %}
+                                        {{ today_log.protein_consumed|floatformat:0 }}g
+                                    {% else %}
+                                        0g
+                                    {% endif %}
+                                </span>
+                                <small class="text-muted">/
+                                    {% if today_log.protein_target %}
+                                        {{ today_log.protein_target|floatformat:0 }}g
+                                    {% elif active_plan %}
+                                        {{ active_plan.protein_target }}g
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Carbs -->
+                        <div class="col-md-4">
+                            <div class="macro-chart mb-2">
+                                <canvas id="carbsChart"></canvas>
+                            </div>
+                            <h6 class="macro-label text-success mb-1">Carbs</h6>
+                            <div class="d-flex justify-content-center align-items-baseline">
+                                <span class="h5 mb-0 me-1">
+                                    {% if today_log.carbs_consumed %}
+                                        {{ today_log.carbs_consumed|floatformat:0 }}g
+                                    {% else %}
+                                        0g
+                                    {% endif %}
+                                </span>
+                                <small class="text-muted">/
+                                    {% if today_log.carbs_target %}
+                                        {{ today_log.carbs_target|floatformat:0 }}g
+                                    {% elif active_plan %}
+                                        {{ active_plan.carbs_target }}g
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Fat -->
+                        <div class="col-md-4">
+                            <div class="macro-chart mb-2">
+                                <canvas id="fatChart"></canvas>
+                            </div>
+                            <h6 class="macro-label text-warning mb-1">Fat</h6>
+                            <div class="d-flex justify-content-center align-items-baseline">
+                                <span class="h5 mb-0 me-1">
+                                    {% if today_log.fat_consumed %}
+                                        {{ today_log.fat_consumed|floatformat:0 }}g
+                                    {% else %}
+                                        0g
+                                    {% endif %}
+                                </span>
+                                <small class="text-muted">/
+                                    {% if today_log.fat_target %}
+                                        {{ today_log.fat_target|floatformat:0 }}g
+                                    {% elif active_plan %}
+                                        {{ active_plan.fat_target }}g
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Nutrition Stats -->
+            <div class="row mb-4">
+                <!-- Water Intake -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="stat-circle bg-info mb-3">
+                                <i class="fas fa-tint fa-lg"></i>
+                            </div>
+                            <h6 class="text-info mb-1">Water</h6>
+                            <h5 class="mb-0">
+                                {% if today_log.water_consumed %}
+                                    {{ today_log.water_consumed|floatformat:1 }}L
+                                {% else %}
+                                    0L
+                                {% endif %}
+                            </h5>
+                            <small class="text-muted">Target: 2.5L</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calories Burned -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="stat-circle bg-danger mb-3">
+                                <i class="fas fa-fire-alt fa-lg"></i>
+                            </div>
+                            <h6 class="text-danger mb-1">Burned</h6>
+                            <h5 class="mb-0">
+                                {% if today_workout %}
+                                    {{ today_workout.calories_burned|default:0 }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </h5>
+                            <small class="text-muted">calories</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Net Calories -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="stat-circle bg-success mb-3">
+                                <i class="fas fa-calculator fa-lg"></i>
+                            </div>
+                            <h6 class="text-success mb-1">Net</h6>
+                            <h5 class="mb-0">
+                                {% if today_log.calories_consumed %}
+                                    {% with burned=today_workout.calories_burned|default:0 %}
+                                        {{ today_log.calories_consumed|add:"-"|add:burned }}
+                                    {% endwith %}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </h5>
+                            <small class="text-muted">calories</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Today's Meal Plan -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Today's Meal Plan</h5>
+                        {% if active_plan %}
+                            <a href="{% url 'meal_plan_detail' active_plan.id %}" class="btn btn-sm btn-outline-primary">
+                                View Full Plan
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if active_plan %}
+                        {% if today_meals %}
+                            <div class="list-group list-group-flush">
+                                {% for meal in today_meals %}
+                                    <div class="list-group-item p-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0">
+                                                <i class="fas
+                                                    {% if meal.meal_type == 'breakfast' %}fa-coffee
+                                                    {% elif meal.meal_type == 'lunch' %}fa-utensils
+                                                    {% elif meal.meal_type == 'dinner' %}fa-drumstick-bite
+                                                    {% elif meal.meal_type == 'snack' %}fa-apple-alt
+                                                    {% elif meal.meal_type == 'pre_workout' %}fa-dumbbell
+                                                    {% elif meal.meal_type == 'post_workout' %}fa-glass-water
+                                                    {% endif %}
+                                                    me-2"></i>
+                                                {{ meal.get_meal_type_display }}
+                                            </h6>
+                                            <span class="badge bg-light text-dark">{{ meal.get_total_calories }} cal</span>
+                                        </div>
+
+                                        {% with meal_items=meal.items.all %}
+                                            {% if meal_items %}
+                                                <div class="small">
+                                                    {% for item in meal_items %}
+                                                        <div class="food-item p-2 mb-1
+                                                            {% if item.food_item.protein > item.food_item.carbs and item.food_item.protein > item.food_item.fat %}protein
+                                                            {% elif item.food_item.carbs > item.food_item.protein and item.food_item.carbs > item.food_item.fat %}carbs
+                                                            {% else %}fat{% endif %}">
+                                                            <div class="d-flex justify-content-between">
+                                                                <span>{{ item.food_item.name }}</span>
+                                                                <span class="text-muted">{{ item.servings }} serving{% if item.servings != 1 %}s{% endif %}</span>
+                                                            </div>
+                                                            <div class="d-flex justify-content-between text-muted">
+                                                                <span>{{ item.get_calories }} cal</span>
+                                                                <span>{{ item.get_protein|floatformat:1 }}p / {{ item.get_carbs|floatformat:1 }}c / {{ item.get_fat|floatformat:1 }}f</span>
+                                                            </div>
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <p class="text-muted small mb-0">No foods added to this meal yet.</p>
+                                            {% endif %}
+                                        {% endwith %}
+
+                                        <div class="mt-2">
+                                            <a href="{% url 'meal_detail' meal.id %}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <a href="{% url 'add_food_to_meal' meal.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-plus"></i> Add Food
+                                            </a>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-utensils fa-3x text-muted mb-3"></i>
+                                <p>No meals scheduled for today</p>
+                                <a href="{% url 'add_meal' active_plan.id %}" class="btn btn-primary">Add Today's Meal</a>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <p>No active meal plan</p>
+                            <a href="{% url 'create_meal_plan' %}" class="btn btn-primary">Create Meal Plan</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Logs Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Recent Nutrition Logs</h5>
+                        <a href="{% url 'nutrition_logs' %}" class="btn btn-sm btn-outline-primary">
+                            View All Logs
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_logs %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Calories</th>
+                                        <th>Protein</th>
+                                        <th>Carbs</th>
+                                        <th>Fat</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for log in recent_logs %}
+                                        <tr>
+                                            <td>{{ log.date|date:"M d, Y" }}
+                                                {% if log.is_cheat_day %}<span class="badge bg-warning text-dark ms-1">Cheat Day</span>{% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    {{ log.calories_consumed|default:0 }}
+                                                    <div class="progress ms-2" style="width: 60px; height: 5px;">
+                                                        <div class="progress-bar bg-primary" style="width: {{ log.get_calories_percentage }}%"></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {{ log.protein_consumed|default:0|floatformat:0 }}g
+                                                <small class="text-muted">({{ log.get_protein_percentage|floatformat:0 }}%)</small>
+                                            </td>
+                                            <td>
+                                                {{ log.carbs_consumed|default:0|floatformat:0 }}g
+                                                <small class="text-muted">({{ log.get_carbs_percentage|floatformat:0 }}%)</small>
+                                            </td>
+                                            <td>
+                                                {{ log.fat_consumed|default:0|floatformat:0 }}g
+                                                <small class="text-muted">({{ log.get_fat_percentage|floatformat:0 }}%)</small>
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'log_nutrition' %}?date={{ log.date|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <p class="text-muted">No nutrition logs yet</p>
+                            <a href="{% url 'log_nutrition' %}" class="btn btn-primary">Log Nutrition</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Action Cards -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm meal-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-search fa-3x text-primary mb-3"></i>
+                    <h5>Food Library</h5>
+                    <p class="text-muted">Search and browse foods with complete nutritional information</p>
+                    <a href="{% url 'food_library' %}" class="btn btn-primary">Explore Foods</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm meal-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-robot fa-3x text-primary mb-3"></i>
+                    <h5>AI Meal Plan</h5>
+                    <p class="text-muted">Generate a personalized meal plan based on your goals</p>
+                    <a href="{% url 'generate_ai_meal_plan' %}" class="btn btn-primary">Generate Plan</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm meal-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-pie fa-3x text-primary mb-3"></i>
+                    <h5>Nutritional Analysis</h5>
+                    <p class="text-muted">Get detailed analysis of your eating patterns</p>
+                    <a href="{% url 'nutrition_logs' %}" class="btn btn-primary">View Analysis</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Protein Chart
+    const proteinCtx = document.getElementById('proteinChart').getContext('2d');
+
+    // Calculate percentages for the charts
+    let proteinPercentage = 0;
+    {% if today_log.protein_consumed and today_log.protein_target %}
+        proteinPercentage = {{ today_log.get_protein_percentage }};
+    {% elif today_log.protein_consumed and active_plan.protein_target %}
+        proteinPercentage = ({{ today_log.protein_consumed }} / {{ active_plan.protein_target }}) * 100;
+    {% endif %}
+
+    if (proteinPercentage > 100) proteinPercentage = 100;
+
+    new Chart(proteinCtx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [proteinPercentage, 100 - proteinPercentage],
+                backgroundColor: ['#4e73df', '#eaecf4'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '75%',
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: false
+                }
+            }
+        }
+    });
+
+    // Carbs Chart
+    const carbsCtx = document.getElementById('carbsChart').getContext('2d');
+
+    let carbsPercentage = 0;
+    {% if today_log.carbs_consumed and today_log.carbs_target %}
+        carbsPercentage = {{ today_log.get_carbs_percentage }};
+    {% elif today_log.carbs_consumed and active_plan.carbs_target %}
+        carbsPercentage = ({{ today_log.carbs_consumed }} / {{ active_plan.carbs_target }}) * 100;
+    {% endif %}
+
+    if (carbsPercentage > 100) carbsPercentage = 100;
+
+    new Chart(carbsCtx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [carbsPercentage, 100 - carbsPercentage],
+                backgroundColor: ['#1cc88a', '#eaecf4'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '75%',
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: false
+                }
+            }
+        }
+    });
+
+    // Fat Chart
+    const fatCtx = document.getElementById('fatChart').getContext('2d');
+
+    let fatPercentage = 0;
+    {% if today_log.fat_consumed and today_log.fat_target %}
+        fatPercentage = {{ today_log.get_fat_percentage }};
+    {% elif today_log.fat_consumed and active_plan.fat_target %}
+        fatPercentage = ({{ today_log.fat_consumed }} / {{ active_plan.fat_target }}) * 100;
+    {% endif %}
+
+    if (fatPercentage > 100) fatPercentage = 100;
+
+    new Chart(fatCtx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [fatPercentage, 100 - fatPercentage],
+                backgroundColor: ['#f6c23e', '#eaecf4'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '75%',
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: false
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
